@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>織光季解鎖計算器</title>
+
+<style>
+/* 基礎樣式 */
+body { font-family:"Segoe UI", sans-serif; background-color:#fafafa; margin:0; padding:0; color:#333; }
+header { text-align:center; background:linear-gradient(135deg,#66a6ff,#89f7fe); color:#fff; padding:12px 0; font-size:22px; font-weight:bold; letter-spacing:1px; box-shadow:0 2px 6px rgba(0,0,0,0.15); }
+
+/* 全局控制區 */
+.global-controls { text-align:center; margin:8px 0; }
+.global-controls input[type="number"] { width: 60px; }
+.totals { text-align:center; margin:8px 0; font-size:10px; font-weight:500; }
+
+input[type="text"], input[type="number"] { padding:5px 8px; border-radius:6px; border:1.5px solid #ccc; font-size:14px; outline:none; width:140px; transition:border-color 0.2s, box-shadow 0.2s; }
+input[type="text"]:focus, input[type="number"]:focus { border-color:#66a6ff; box-shadow:0 0 3px rgba(102,166,255,0.5); }
+button { background-color:#66a6ff; color:white; border:none; border-radius:6px; padding:5px 10px; font-size:14px; cursor:pointer; transition:0.2s; }
+button:hover { background-color:#5597f0; transform:translateY(-1px); }
+button:active { transform:translateY(1px); }
+h2 { font-size:18px; margin:6px 0; color:#444; text-align:center; font-weight:600; }
+
+/* 物品容器與群組間距 (調整為更寬鬆) */
+#spiritsContainer { 
+    display:flex; 
+    flex-wrap:wrap; 
+    justify-content:center; 
+    gap: 20px; /* <-- 增加間距 */
+    padding:12px; 
+} 
+.spirit { 
+    display:flex; flex-direction:column; align-items:center; 
+    border:1px solid #aaa; border-radius:10px; padding:8px; 
+    width:200px; /* <-- 增加寬度 */
+    box-shadow:0 1px 3px rgba(0,0,0,0.08); 
+    background-color:#fff; 
+    transition:transform 0.2s, box-shadow 0.2s; 
+    margin-bottom:10px;
+}
+
+.spirit-image {
+    width: 80px; /* 設定圖片寬度 */
+    height: 200px;
+    border-radius: 50%; /* 圓形圖片效果 */
+    margin-bottom: 8px;
+    border: 2px solid #ddd;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.spirit:hover { transform:translateY(-3px); box-shadow:0 3px 8px rgba(0,0,0,0.12); }
+.spirit-header { font-size:16px; font-weight:bold; margin-bottom:6px; color:#222; text-align:center; min-height: 50px;} /* 放大字體 */
+.spirit-footer { font-size:12px; margin-top:8px; color:#666; text-align:center; } /* 放大字體 */
+
+/* 先祖控制條 */
+.spirit-controls { 
+    margin-top: 4px; 
+    margin-bottom: 8px; 
+    display: flex; 
+    flex-direction: column; 
+    align-items: center;
+    gap: 4px;
+    padding: 4px 0;
+    border-top: 1px solid #eee;
+}
+.spirit-controls .input-group {
+    display: flex;
+    gap: 2px;
+    align-items: center;
+}
+.spirit-controls button {
+    padding: 3px 6px;
+    font-size: 12px;
+}
+.spirit-controls input[type="number"] {
+    width: 35px;
+    padding: 2px 4px;
+    font-size: 12px;
+}
+
+/* 層級與物品行間距 */
+.level-row { 
+    display:flex; 
+    flex-direction:column-reverse;
+    align-items:center; 
+    margin-bottom:4px; 
+    border-top:1px solid #eee; 
+    padding-top:4px; 
+    width:100%;
+}
+.level-label { font-weight:bold; font-size:12px; margin-top:2px; color:#222; }
+.items-row { 
+    display:flex; 
+    justify-content:flex-start; 
+    gap: 4px; /* 增加行內物品間距 */
+    margin-bottom:1px; 
+    width:100%; 
+}
+.item { 
+    width:60px; /* 增加物品寬度 */
+    text-align:center; cursor:pointer; 
+    border:1.5px solid gray; border-radius:6px; 
+    padding:3px; 
+    transition:0.2s; 
+    background-color:#f9f9f9; 
+    flex-shrink: 0; 
+}
+.item:hover { border-color:#66a6ff; box-shadow:0 0 4px rgba(102,166,255,0.6); }
+.item.unlocked { border-color:#4CAF50; background-color:#e7fbe7; }
+.item.season { border-color:#ff9800; background-color:#fff3e0; }
+.item.unlocked.season { border-color:#4CAF50; background-color:#e7fbe7; 
+}
+.item img { width:100%; height:auto; border-radius:6px; }
+.item div { font-size:10px; margin-top:1px; line-height:1.1; }
+
+/* 媒體查詢 */
+@media (max-width:900px) { 
+    .spirit { width: calc(50% - 10px); } 
+}
+@media (max-width:600px) { 
+    .spirit { width: calc(50% - 10px); } 
+    .item { width: 45px; } 
+}
+</style>
+</head>
+<body>
+
+<header>織光季解鎖計算器</header>
+
+<div class="totals">
+總需求季蠟: <span id="totalRequiredCandle">0</span>
+總好感度: <span id="totalExp">0</span> |
+總季蠟: <span id="totalCandle">0</span> 
+**還需天數: <span id="daysRequired">0</span>**
+</div>
+
+<div class="global-controls">
+<button onclick="resetAll()">重置全部</button>
+</div>
+
+<div id="spiritsContainer"></div>
+
+<script>
+let items = [];
+// 移除全局 exp 變量，改用 spiritExpMap 儲存每個先祖的陪伴好感度
+let spiritExpMap = {}; 
+const EXP_PER_ITEM = 1; // 陪伴好感度單次增加量
+let totalRequiredCandle = 0;
+
+// 載入 JSON
+fetch('data/items.json')
+.then(resp=>resp.json())
+.then(data=>{
+    const migrationData = data["Season of Lightmending"];
+    items = [];
+    spiritExpMap = JSON.parse(localStorage.getItem('spiritExpMap') || '{}');
+    totalRequiredCandle = 0;
+
+    const spiritDataMap = {};
+
+    Object.keys(migrationData).forEach(key=>{
+        const spirit = migrationData[key];
+        // 儲存先祖資訊
+        spiritDataMap[key] = { name: spirit.name, image: spirit.image };
+
+        if(spiritExpMap[key] === undefined) spiritExpMap[key] = 0; 
+        
+        spirit.items.forEach(item=>{
+            item.spiritKey = key; 
+            item.spiritName = spirit.name;
+            item.spiritImage = spirit.image; 
+            item.key = `${key}_${item.nm}_${item.level}`;
+            items.push(item);
+
+            totalRequiredCandle += (parseInt(item.cst) || 0);
+        });
+    });
+    // 讀 localStorage
+    items.forEach(i=>i.unlocked = JSON.parse(localStorage.getItem(i.key)||"false"));
+    
+    updateUI(spiritDataMap); // 傳遞先祖數據地圖
+}).catch(err=>{
+    console.error("載入 JSON 失敗或檔案不存在：", err);
+    document.getElementById('spiritsContainer').innerHTML = "<p style='text-align:center; color:red;'>錯誤：無法載入物品資料 (data/items.json)。請檢查檔案路徑。</p>";
+});
+
+function saveState(){
+    items.forEach(i=>localStorage.setItem(i.key,i.unlocked));
+    // 保存每個先祖的好感度
+    localStorage.setItem('spiritExpMap', JSON.stringify(spiritExpMap)); 
+}
+
+// 計算總好感度與總季蠟
+function calcTotals(){
+    let totalExp=0, totalCandle=0;
+    const spiritTotals={};
+
+    const spiritRequiredCandles = {};
+
+    items.forEach(i=>{
+        const c=parseInt(i.cst)||0;
+        
+        // 累積該先祖的總季蠟需求
+        if(!spiritRequiredCandles[i.spiritKey]) spiritRequiredCandles[i.spiritKey] = 0;
+        spiritRequiredCandles[i.spiritKey] += c;
+
+        if(i.unlocked){
+            const e=parseInt(i.exp)||0, c=parseInt(i.cst)||0;
+            totalExp+=e; totalCandle+=c;
+            
+            if(!spiritTotals[i.spiritKey]) spiritTotals[i.spiritKey]={exp:0,cst:0};
+            spiritTotals[i.spiritKey].exp+=e;
+            spiritTotals[i.spiritKey].cst+=c;
+        }
+    });
+    return {totalExp,totalCandle,spiritTotals, spiritRequiredCandles};
+}
+
+// 計算每個先祖各層累積好感度需求
+function calcspiritLevels(spiritItems){
+    const levelsExp = {};
+    for(let lv=2; lv<=5; lv++){
+        const prevItems = spiritItems.filter(i=>i.level<lv);
+        const cumExp = prevItems.reduce((sum,i)=>sum+(parseInt(i.exp)||0),0);
+        levelsExp[lv]=cumExp;
+    }
+    return levelsExp;
+}
+
+// 計算該先祖已解鎖物品好感度 + 陪伴好感度
+function calcspiritCurrentExp(spiritKey, spiritItems){
+    const itemsExp = spiritItems
+        .filter(i=>i.unlocked)
+        .reduce((sum,i)=>sum+(parseInt(i.exp)||0),0);
+
+    // 加上該先祖的陪伴好感度
+    const additionalExp = spiritExpMap[spiritKey] || 0;
+    
+    return itemsExp + additionalExp; 
+}
+
+// 計算該先祖可解鎖最大層
+function calcMaxLevel(spiritKey, spiritItems){
+    const levelsExp = calcspiritLevels(spiritItems);
+    // 使用該先祖的當前總好感度來計算可解鎖等級
+    const currentTotalExp = calcspiritCurrentExp(spiritKey, spiritItems); 
+    let maxLevel=1;
+    for(let lv=2; lv<=5; lv++){
+        if(currentTotalExp >= levelsExp[lv]) maxLevel=lv; 
+        else break;
+    }
+    return maxLevel;
+}
+
+//計算所需天數
+function calcDaysRequired(totalCandleSpent, totalCandleRequired) {
+    const DAILY_CANDLE_GAIN = 6;
+    const INITIAL_CANDLE_START = 30; // 初始季蠟
+
+    let remainingCandles = totalCandleRequired - totalCandleSpent;
+    if (remainingCandles <= 0) {
+        return 0;
+    }
+    if (remainingCandles > INITIAL_CANDLE_START) {
+        remainingCandles -= INITIAL_CANDLE_START;
+    } else {
+        return 0;
+    }
+    const days = Math.ceil(remainingCandles / DAILY_CANDLE_GAIN);
+    return days;
+}
+
+function updateUI(){
+    const container = document.getElementById('spiritsContainer');
+    if (!container) {
+        console.error("錯誤：找不到 ID 為 'spiritsContainer' 的容器。");
+        return; 
+    }
+    container.innerHTML='';
+
+    const totals = calcTotals();
+    const days = calcDaysRequired(totals.totalCandle, totalRequiredCandle);
+    document.getElementById('daysRequired').textContent = days;
+
+    document.getElementById('totalExp').textContent = totals.totalExp; 
+    document.getElementById('totalCandle').textContent = totals.totalCandle;
+    document.getElementById('totalRequiredCandle').textContent = totalRequiredCandle;
+
+    // 先祖分組
+    const spiritsGrouped = {};
+    items.forEach(i=>{
+        if(!spiritsGrouped[i.spiritKey]) spiritsGrouped[i.spiritKey]=[];
+        spiritsGrouped[i.spiritKey].push(i);
+    });
+
+    // 每行最多 3 個
+    const ITEMS_PER_ROW = 3; 
+    
+    Object.keys(spiritsGrouped).forEach(spiritKey=>{
+        const spiritItems = spiritsGrouped[spiritKey];
+        const spiritName = spiritItems[0].spiritName;
+        const spiritImage = spiritItems[0].spiritImage;
+        
+        const ancDiv = document.createElement('div');
+        ancDiv.className='spirit';
+
+        if (spiritImage) {
+            const img = document.createElement('img');
+            img.src = spiritImage;
+            img.className = 'spirit-image';
+            img.alt = spiritName;
+            ancDiv.appendChild(img);
+        }
+
+        const header = document.createElement('div');
+        header.className='spirit-header';
+        header.textContent = spiritName;
+        ancDiv.appendChild(header);
+        
+        // 先祖專屬好感度控制 UI
+        const controlsDiv = document.createElement('div');
+        controlsDiv.className = 'spirit-controls';
+        
+        const currentExpValue = spiritExpMap[spiritKey] || 0;
+
+        // 1. 顯示和修改陪伴好感度
+        const inputGroup = document.createElement('div');
+        inputGroup.className = 'input-group';
+        inputGroup.innerHTML = `陪伴好感度: <span id="exp-${spiritKey}">${currentExpValue}</span>`;
+        
+        const inputExp = document.createElement('input');
+        inputExp.type = 'number';
+        inputExp.value = EXP_PER_ITEM; // 預設 +10
+        inputExp.id = `input-${spiritKey}`;
+
+        const btnAddExp = document.createElement('button');
+        btnAddExp.textContent = `+${EXP_PER_ITEM} 陪伴好感度`;
+        btnAddExp.onclick = () => addspiritExp(spiritKey, parseInt(inputExp.value) || EXP_PER_ITEM);
+
+        const btnReset = document.createElement('button');
+        btnReset.textContent = '重置陪伴好感度/物品';
+        btnReset.onclick = () => resetspirit(spiritKey);
+
+        controlsDiv.appendChild(inputGroup);
+        controlsDiv.appendChild(btnAddExp);
+        controlsDiv.appendChild(btnReset);
+        ancDiv.appendChild(controlsDiv);
+        
+        const itemsContainer = document.createElement('div');
+        itemsContainer.className = 'items-group-wrapper'; 
+
+        const lvGroups = {};
+        for(let lv=1; lv<=5; lv++){
+            lvGroups[lv] = spiritItems.filter(i=>i.level===lv);
+        }
+
+        Object.keys(lvGroups).sort((a,b)=>b-a).forEach(level=>{
+            const levelItems = lvGroups[level];
+            if(levelItems.length===0) return;
+
+            const levelRowWrapper = document.createElement('div');
+            levelRowWrapper.className='level-row';
+
+            const label = document.createElement('div');
+            label.className='level-label';
+            label.textContent = 'Lv.' + level;
+            levelRowWrapper.appendChild(label);
+
+            const spiritGroups = {};
+            levelItems.forEach(item=>{
+                if(!spiritGroups[item.spirit]) spiritGroups[item.spirit]=[];
+                spiritGroups[item.spirit].push(item);
+            });
+
+            Object.keys(spiritGroups).sort((a,b)=>a-b).forEach(spirit=>{
+                const itemsInspirit = spiritGroups[spirit];
+                const nonSeason = itemsInspirit.filter(i=>!i.season);
+                const season = itemsInspirit.filter(i=>i.season);
+                const orderedItems = [...nonSeason, ...season];
+
+                for(let i=Math.floor((orderedItems.length-1)/ITEMS_PER_ROW)*ITEMS_PER_ROW; i>=0; i-=ITEMS_PER_ROW){
+                    const slice = orderedItems.slice(i, i+ITEMS_PER_ROW);
+                    const innerRow = document.createElement('div');
+                    innerRow.className='items-row';
+                    
+                    let nonSeasonCount = 0;
+                    let firstSeasonItemDiv = null; // 修正: 初始化為 null
+
+                    slice.forEach(item=>{
+                        const itemDiv = createItemDiv(item, spiritItems, spiritKey); // 傳入 spiritKey
+                        innerRow.appendChild(itemDiv);
+                        
+                        if (!item.season) {
+                            nonSeasonCount++;
+                        } else if (!firstSeasonItemDiv) { 
+                            firstSeasonItemDiv = itemDiv; // 修正: 儲存 DOM 元素引用
+                        }
+                    });
+
+                    if (nonSeasonCount > 0 && nonSeasonCount < slice.length && firstSeasonItemDiv) {
+                        // 混合物品：用 margin: auto 將季節物品推向右側
+                        firstSeasonItemDiv.style.marginLeft = 'auto'; // 修正: 使用正確的變數
+                    } else if (nonSeasonCount === 0 && slice.length > 0) {
+                        // 純季節物品：整行靠右
+                        innerRow.style.justifyContent = 'flex-end';
+                    }
+                    levelRowWrapper.insertBefore(innerRow, levelRowWrapper.firstChild);
+                }
+            });
+
+            itemsContainer.appendChild(levelRowWrapper);
+        });
+        
+        ancDiv.appendChild(itemsContainer);
+
+        // footer
+        const totalspiritExp = calcspiritCurrentExp(spiritKey, spiritItems);
+        const unlockedItemsExp = totals.spiritTotals[spiritKey]?.exp || 0;
+        const t = totals.spiritTotals[spiritKey]||{exp:0,cst:0}
+        const spiritTotalRequiredCost = totals.spiritRequiredCandles[spiritKey] || 0;
+        const footer = document.createElement('div');
+        footer.className='spirit-footer';
+        footer.innerHTML = `總需求季蠟: ${spiritTotalRequiredCost} <br> 已解鎖物品好感度: ${unlockedItemsExp} <br> 總解鎖好感度: ${totalspiritExp}, 總兌換需求季蠟: ${t.cst}`;
+        ancDiv.appendChild(footer);
+
+        container.appendChild(ancDiv);
+    });
+}
+
+
+// 建立 item div
+function createItemDiv(item, spiritItems, spiritKey){
+    const spiritName = item.spiritName;
+    const div=document.createElement('div');
+    div.className='item';
+    if(item.unlocked) div.classList.add('unlocked');
+    if(item.season) div.classList.add('season');
+
+    div.innerHTML=`
+        <img class="item-img" src="${item.image}">
+        <div style="font-weight:bold">${item.nm}</div>
+        <div>季蠟 ${item.cst}</div>
+        <div>好感度: ${item.exp}</div>
+    `;
+
+    div.addEventListener('click', ()=>{
+        // 使用該先祖的 key 來計算 maxLevel
+        const maxLevel = calcMaxLevel(spiritKey, spiritItems); 
+
+        if(item.level <= maxLevel || item.unlocked){
+            item.unlocked=!item.unlocked;
+            saveState();
+            updateUI();
+        } else {
+            alert(`你還不能解鎖 ${spiritName}的Lv.${item.level}。\n需要總好感度達到 ${calcspiritLevels(spiritItems)[item.level]||'??'} ，先解鎖低層物品。`);
+        }
+    });
+
+    return div;
+}
+
+// 增加單個先祖的好感度
+function addspiritExp(spiritKey, amount){
+    if(amount > 0){
+        spiritExpMap[spiritKey] = (spiritExpMap[spiritKey] || 0) + amount;
+        saveState();
+        updateUI();
+    }
+}
+
+// 重置單個先祖的好感度和物品
+function resetspirit(spiritKey){
+    if(confirm(`確定重置先祖 ${items.find(i => i.spiritKey === spiritKey)?.spiritName || spiritKey} 的所有解鎖物品和陪伴好感度嗎？`)){
+        // 重置該先祖下的所有物品
+        items.filter(i => i.spiritKey === spiritKey).forEach(i => i.unlocked = false);
+        
+        // 重置該先祖的陪伴好感度
+        spiritExpMap[spiritKey] = 0;
+        
+        saveState();
+        updateUI();
+    }
+}
+
+// 重置全部
+function resetAll(){
+    if(confirm('確定重置全部先祖的解鎖物品和陪伴好感度嗎？')){
+        items.forEach(i=>i.unlocked=false);
+        spiritExpMap = {};
+        saveState();
+        updateUI();
+    }
+}
+</script>
+</body>
+</html>
